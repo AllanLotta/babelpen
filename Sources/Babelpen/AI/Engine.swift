@@ -1,7 +1,7 @@
 import Foundation
-import RevisorCore
+import BabelpenCore
 
-/// Something that proofreads text through a local AI CLI. Revisor never talks
+/// Something that proofreads text through a local AI CLI. Babelpen never talks
 /// to an API with a key: it drives the CLI you're already logged into, so the
 /// work runs on your existing plan.
 protocol ProofreadEngine: AnyObject {
@@ -11,7 +11,7 @@ protocol ProofreadEngine: AnyObject {
     var onLog: ((String) -> Void)? { get set }
     func warmUp()
     /// Calls back on the main queue with the model's raw answer, or nil on failure.
-    func proofread(_ text: String, completion: @escaping (String?) -> Void)
+    func proofread(_ text: String, context: PromptContext, completion: @escaping (String?) -> Void)
     func shutdown()
 }
 
@@ -19,12 +19,11 @@ enum EngineFactory {
     static func make(_ config: Config) -> ProofreadEngine {
         switch config.provider {
         case .claude:
-            return ClaudeCodeEngine(model: config.model.isEmpty ? "haiku" : config.model,
-                                    effort: config.effort, about: config.about)
+            return ClaudeCodeEngine(model: config.model.isEmpty ? "haiku" : config.model, effort: config.effort)
         case .codex:
-            return OneShotEngine.codex(model: config.model, effort: config.effort, about: config.about)
+            return OneShotEngine.codex(model: config.model, effort: config.effort)
         case .command:
-            return OneShotEngine.custom(command: config.command, about: config.about)
+            return OneShotEngine.custom(command: config.command)
         }
     }
 }
@@ -65,7 +64,7 @@ enum CLI {
     }
 
     static var scratchDirectory: URL {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("revisor")
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("babelpen")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }

@@ -1,7 +1,7 @@
 import AppKit
 import ApplicationServices
 
-/// Thin helpers over the macOS Accessibility API. This is how Revisor reads
+/// Thin helpers over the macOS Accessibility API. This is how Babelpen reads
 /// what you type in any app: the focused UI element and its AXValue.
 enum AX {
     static func isTrusted(prompt: Bool) -> Bool {

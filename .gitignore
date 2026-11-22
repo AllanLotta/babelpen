@@ -1,8 +1,9 @@
 .build/
 .swiftpm/
-Revisor.app/
+Babelpen.app/
 *.xcodeproj/
 xcuserdata/
 .DS_Store
 # Per-machine build settings (signing identity, bundle id)
 local.env
+dist/

@@ -1,7 +1,7 @@
 import AppKit
-import RevisorCore
+import BabelpenCore
 
-/// A floating panel that can be clicked without activating Revisor, so the
+/// A floating panel that can be clicked without activating Babelpen, so the
 /// keyboard focus stays in the app you're typing in.
 final class FloatingPanel: NSPanel {
     override var canBecomeKey: Bool { false }

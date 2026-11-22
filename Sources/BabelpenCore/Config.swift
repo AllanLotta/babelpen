@@ -1,6 +1,6 @@
 import Foundation
 
-/// User settings, stored as JSON in ~/Library/Application Support/Revisor/config.json.
+/// User settings, stored as JSON in ~/Library/Application Support/Babelpen/config.json.
 /// Every key is optional in the file; missing keys fall back to the defaults below.
 public struct Config: Codable, Equatable {
     public enum Provider: String, Codable, CaseIterable {
@@ -23,10 +23,12 @@ public struct Config: Codable, Equatable {
     public var debounceSeconds: Double = 1.0
     public var minCharacters: Int = 8
     public var maxCharacters: Int = 2500
-    /// Bundle identifiers where Revisor stays quiet.
+    /// Bundle identifiers where Babelpen stays quiet.
     public var ignoredApps: [String] = Config.defaultIgnoredApps
-    /// UI language: "en", "pt", or empty to follow the system.
-    public var language: String = ""
+    /// Languages you write in (ISO 639-1 codes like "en", "it"). Empty = your system languages.
+    public var languages: [String] = []
+    /// Interface language: "en", "pt", "es", "fr", "de", "it", or empty to follow the system.
+    public var interfaceLanguage: String = ""
 
     public static let defaultIgnoredApps = [
         "com.apple.Terminal", "com.googlecode.iterm2", "com.mitchellh.ghostty", "dev.warp.Warp-Stable",
@@ -38,7 +40,9 @@ public struct Config: Codable, Equatable {
     public init() {}
 
     private enum Keys: String, CodingKey {
-        case provider, model, effort, command, about, debounceSeconds, minCharacters, maxCharacters, ignoredApps, language
+        case provider, model, effort, command, about, debounceSeconds, minCharacters, maxCharacters, ignoredApps
+        case languages, interfaceLanguage
+        case language // 0.1 name of interfaceLanguage, still read
     }
 
     public init(from decoder: Decoder) throws {
@@ -53,7 +57,24 @@ public struct Config: Codable, Equatable {
         minCharacters = try c.decodeIfPresent(Int.self, forKey: .minCharacters) ?? d.minCharacters
         maxCharacters = try c.decodeIfPresent(Int.self, forKey: .maxCharacters) ?? d.maxCharacters
         ignoredApps = try c.decodeIfPresent([String].self, forKey: .ignoredApps) ?? d.ignoredApps
-        language = try c.decodeIfPresent(String.self, forKey: .language) ?? d.language
+        languages = try c.decodeIfPresent([String].self, forKey: .languages) ?? d.languages
+        interfaceLanguage = try c.decodeIfPresent(String.self, forKey: .interfaceLanguage)
+            ?? c.decodeIfPresent(String.self, forKey: .language) ?? d.interfaceLanguage
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: Keys.self)
+        try c.encode(provider, forKey: .provider)
+        try c.encode(model, forKey: .model)
+        try c.encode(effort, forKey: .effort)
+        try c.encode(command, forKey: .command)
+        try c.encode(about, forKey: .about)
+        try c.encode(debounceSeconds, forKey: .debounceSeconds)
+        try c.encode(minCharacters, forKey: .minCharacters)
+        try c.encode(maxCharacters, forKey: .maxCharacters)
+        try c.encode(ignoredApps, forKey: .ignoredApps)
+        try c.encode(languages, forKey: .languages)
+        try c.encode(interfaceLanguage, forKey: .interfaceLanguage)
     }
 
     public static func decode(_ data: Data) throws -> Config { try JSONDecoder().decode(Config.self, from: data) }
@@ -72,9 +93,35 @@ public final class ConfigStore {
 
     public init(url: URL = ConfigStore.defaultURL) { self.url = url }
 
+    /// vocabulary.txt, next to config.json.
+    public var vocabularyURL: URL { url.deletingLastPathComponent().appendingPathComponent("vocabulary.txt") }
+
+    /// Your vocabulary terms. Creates the file with instructions on first use.
+    public func vocabulary() -> [String] {
+        guard let text = try? String(contentsOf: vocabularyURL, encoding: .utf8) else {
+            writeVocabulary(Vocabulary.fileHeader)
+            return []
+        }
+        return Vocabulary.parse(text)
+    }
+
+    /// Adds a term. Returns false when it was already there.
+    @discardableResult
+    public func addToVocabulary(_ term: String) -> Bool {
+        let current = (try? String(contentsOf: vocabularyURL, encoding: .utf8)) ?? Vocabulary.fileHeader
+        guard let updated = Vocabulary.appending(term, to: current) else { return false }
+        writeVocabulary(updated)
+        return true
+    }
+
+    private func writeVocabulary(_ text: String) {
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? text.write(to: vocabularyURL, atomically: true, encoding: .utf8)
+    }
+
     public static var defaultURL: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Revisor/config.json")
+            .appendingPathComponent("Babelpen/config.json")
     }
 
     /// Reads the file, creating it with defaults on first run. Returns an error

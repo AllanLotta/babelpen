@@ -1,5 +1,5 @@
 import Foundation
-import RevisorCore
+import BabelpenCore
 
 /// Claude Code (`claude`) kept running in headless streaming mode:
 /// `claude -p --input-format stream-json --output-format stream-json`.
@@ -14,7 +14,6 @@ final class ClaudeCodeEngine: ProofreadEngine {
 
     private let model: String
     private let effort: String
-    private let systemPrompt: String
     private let maxRequests = 20
     private let timeout: TimeInterval = 25
 
@@ -25,15 +24,14 @@ final class ClaudeCodeEngine: ProofreadEngine {
     private var served = 0
     private var nextID = 0
 
-    init(model: String, effort: String, about: String) {
+    init(model: String, effort: String) {
         self.model = model
         self.effort = effort
-        self.systemPrompt = Prompt.system(about: about)
     }
 
     func warmUp() { if process == nil { start() } }
 
-    func proofread(_ text: String, completion: @escaping (String?) -> Void) {
+    func proofread(_ text: String, context: PromptContext, completion: @escaping (String?) -> Void) {
         if fatalReason != nil { completion(nil); return }
         if process != nil, served >= maxRequests, pending.isEmpty { stopProcess() }
         if process == nil { start() }
@@ -45,7 +43,7 @@ final class ClaudeCodeEngine: ProofreadEngine {
         served += 1
         let message: [String: Any] = [
             "type": "user",
-            "message": ["role": "user", "content": Prompt.userMessage(text)],
+            "message": ["role": "user", "content": Prompt.userMessage(text, context: context)],
             "parent_tool_use_id": NSNull(),
         ]
         var line = (try? JSONSerialization.data(withJSONObject: message)) ?? Data()
@@ -82,7 +80,7 @@ final class ClaudeCodeEngine: ProofreadEngine {
         var args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
                     "--model", model,
                     "--setting-sources", "", "--strict-mcp-config", "--disable-slash-commands",
-                    "--system-prompt", systemPrompt, "--tools", "", "--no-session-persistence"]
+                    "--system-prompt", Prompt.system, "--tools", "", "--no-session-persistence"]
         if !effort.isEmpty { args += ["--effort", effort] }
         p.arguments = args
         p.environment = CLI.environment(binary: binary)
@@ -146,10 +144,10 @@ final class ClaudeCodeEngine: ProofreadEngine {
                   let type = object["type"] as? String else { continue }
             switch type {
             case "system" where object["subtype"] as? String == "init":
-                // Refuse to run on an API key: Revisor is meant to use your plan.
+                // Refuse to run on an API key: Babelpen is meant to use your plan.
                 if let source = object["apiKeySource"] as? String, source != "none" {
                     fatalReason = "API key detected"
-                    log("apiKeySource=\(source): refusing, Revisor only runs on your Claude login")
+                    log("apiKeySource=\(source): refusing, Babelpen only runs on your Claude login")
                     failAllAndStop()
                     return
                 }

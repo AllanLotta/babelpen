@@ -1,10 +1,11 @@
 import AppKit
 import ApplicationServices
 import Carbon
-import RevisorCore
+import BabelpenCore
 
 struct Suggestion {
     let element: AXUIElement
+    let pid: pid_t
     let source: String
     let fixed: String
 }
@@ -40,11 +41,11 @@ final class AppController: NSObject, NSApplicationDelegate {
     private var reviews = 0, applied = 0
 
     /// Demo/recording helper: auto-apply suggestions after N seconds.
-    private let demoAutoApply = Double(ProcessInfo.processInfo.environment["REVISOR_DEMO_AUTO_APPLY"] ?? "")
+    private let demoAutoApply = Double(ProcessInfo.processInfo.environment["BABELPEN_DEMO_AUTO_APPLY"] ?? "")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let error = store.load() { Log.write(error) }
-        l10n = L10n(L10n.detect(override: config.language))
+        l10n = L10n(L10n.detect(override: config.interfaceLanguage))
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.menu = menu
         stateLine.isEnabled = false
@@ -54,6 +55,8 @@ final class AppController: NSObject, NSApplicationDelegate {
         panel.onDismiss = { [weak self] in self?.dismiss() }
         HotKeys.register(id: 1, keyCode: kVK_ANSI_G, modifiers: controlKey | optionKey) { [weak self] in self?.apply() }
         HotKeys.register(id: 2, keyCode: kVK_ANSI_R, modifiers: controlKey | optionKey) { [weak self] in self?.checkNow() }
+        HotKeys.register(id: 3, keyCode: kVK_ANSI_V, modifiers: controlKey | optionKey) { [weak self] in self?.addSelectionToVocabulary() }
+        _ = store.vocabulary() // creates vocabulary.txt with instructions on first run
 
         makeEngine()
         trusted = AX.isTrusted(prompt: true)
@@ -63,7 +66,9 @@ final class AppController: NSObject, NSApplicationDelegate {
 
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(appSwitched), name: NSWorkspace.didActivateApplicationNotification, object: nil)
-        Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in self?.tick() }
+        // .common mode: keep watching while a menu is open, too.
+        let timer = Timer(timeInterval: 0.35, repeats: true) { [weak self] _ in self?.tick() }
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     func applicationWillTerminate(_ notification: Notification) { engine?.shutdown() }
@@ -124,16 +129,16 @@ final class AppController: NSObject, NSApplicationDelegate {
             return
         }
         forceNext = false
-        review(text, element: element)
+        review(text, element: element, pid: pid)
     }
 
-    private func review(_ text: String, element: AXUIElement) {
+    private func review(_ text: String, element: AXUIElement, pid: pid_t) {
         checking = true
         lastChecked = text
         reviews += 1
         setState("✎…", l10n.reviewing)
         let started = Date()
-        engine.proofread(text) { [weak self] raw in
+        engine.proofread(text, context: promptContext()) { [weak self] raw in
             guard let self else { return }
             self.checking = false
             let ms = Int(Date().timeIntervalSince(started) * 1000)
@@ -157,7 +162,7 @@ final class AppController: NSObject, NSApplicationDelegate {
             let ops = Diff.diff(text, fixed)
             let count = Diff.changeCount(ops)
             Log.write("ok \(ms)ms chars=\(text.count) fixes=\(count)")
-            self.suggestion = Suggestion(element: element, source: text, fixed: fixed)
+            self.suggestion = Suggestion(element: element, pid: pid, source: text, fixed: fixed)
             self.setState("✎\(count)", self.l10n.fixes(count, ms: ms))
             self.showCard(ops: ops, count: count, element: element)
         }
@@ -179,11 +184,22 @@ final class AppController: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Languages, note and vocabulary sent with each review. Read fresh every
+    /// time, so edits to config.json or vocabulary.txt apply immediately.
+    private func promptContext() -> PromptContext {
+        PromptContext(languages: Languages.effective(config.languages).map { Languages.name($0, in: "en") },
+                      about: config.about,
+                      vocabulary: store.vocabulary())
+    }
+
     // MARK: - Actions
 
     @objc private func apply() {
         guard let s = suggestion else { return }
-        guard let current = AX.value(s.element), current == s.source else {
+        // The paste goes to the frontmost app, so it must still be the one the
+        // suggestion belongs to.
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == s.pid,
+              let current = AX.value(s.element), current == s.source else {
             Log.write("apply skipped: text changed")
             hidePanel()
             return
@@ -225,6 +241,51 @@ final class AppController: NSObject, NSApplicationDelegate {
         setState("✎", l10n.ready)
     }
 
+    @objc private func toggleWritingLanguage(_ sender: NSMenuItem) {
+        guard let code = sender.representedObject as? String else { return }
+        store.update { $0.languages = Languages.toggle(code, in: $0.languages) }
+        Log.write("writing languages -> \(Languages.effective(config.languages).joined(separator: ","))")
+        rebuildMenu()
+    }
+
+    @objc private func matchSystemLanguages() {
+        store.update { $0.languages = [] }
+        rebuildMenu()
+    }
+
+    @objc private func selectInterfaceLanguage(_ sender: NSMenuItem) {
+        let code = sender.representedObject as? String ?? ""
+        store.update { $0.interfaceLanguage = code }
+        l10n = L10n(L10n.detect(override: code))
+        panel.setStrings(l10n)
+        stateText = l10n.ready
+        rebuildMenu()
+    }
+
+    @objc private func editVocabulary() {
+        _ = store.vocabulary()
+        NSWorkspace.shared.open(store.vocabularyURL)
+    }
+
+    /// ⌃⌥V: adds the selected word in the frontmost app to vocabulary.txt.
+    @objc private func addSelectionToVocabulary() {
+        var selection: String?
+        if let front = NSWorkspace.shared.frontmostApplication, front.processIdentifier != getpid(),
+           let element = AX.focusedElement(pid: front.processIdentifier) {
+            selection = AX.attribute(element, kAXSelectedTextAttribute)
+        }
+        guard let term = selection.flatMap(Vocabulary.normalize) else {
+            setState(stateIcon, l10n.nothingSelected)
+            return
+        }
+        if store.addToVocabulary(term) {
+            Log.write("vocabulary +1 (\(store.vocabulary().count) terms)")
+            setState("✎✓", l10n.added(term))
+        } else {
+            setState(stateIcon, l10n.alreadyThere(term))
+        }
+    }
+
     @objc private func openAccessibilitySettings() {
         _ = AX.isTrusted(prompt: true)
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
@@ -242,7 +303,7 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     @objc private func reloadConfig() {
         if let error = store.load() { Log.write(error) }
-        l10n = L10n(L10n.detect(override: config.language))
+        l10n = L10n(L10n.detect(override: config.interfaceLanguage))
         panel.setStrings(l10n)
         makeEngine()
         setState("✎", l10n.ready)
@@ -288,9 +349,42 @@ final class AppController: NSObject, NSApplicationDelegate {
             if provider == .command, config.command.isEmpty { entry.isEnabled = false; entry.action = nil }
             engines.addItem(entry)
         }
-        let engineItem = NSMenuItem(title: l10n.engine, action: nil, keyEquivalent: "")
-        engineItem.submenu = engines
-        menu.addItem(engineItem)
+        menu.addItem(submenu(l10n.engine, engines))
+
+        // Writing languages: the system's by default, any combination you like.
+        let writing = NSMenu()
+        let match = item(l10n.matchSystem, #selector(matchSystemLanguages))
+        match.state = config.languages.isEmpty ? .on : .off
+        writing.addItem(match)
+        writing.addItem(.separator())
+        let active = Languages.effective(config.languages)
+        let ui = l10n.language.rawValue
+        let codes = active.filter { !Languages.common.contains($0) } + Languages.common
+        for code in codes.sorted(by: { (active.contains($0) ? 0 : 1, Languages.name($0, in: ui)) < (active.contains($1) ? 0 : 1, Languages.name($1, in: ui)) }) {
+            let entry = item(Languages.name(code, in: ui), #selector(toggleWritingLanguage(_:)))
+            entry.representedObject = code
+            entry.state = active.contains(code) ? .on : .off
+            writing.addItem(entry)
+        }
+        menu.addItem(submenu(l10n.writingLanguages, writing))
+
+        let interface = NSMenu()
+        let system = item(l10n.systemDefault, #selector(selectInterfaceLanguage(_:)))
+        system.representedObject = ""
+        system.state = config.interfaceLanguage.isEmpty ? .on : .off
+        interface.addItem(system)
+        interface.addItem(.separator())
+        for language in L10n.Language.allCases {
+            let entry = item(language.nativeName, #selector(selectInterfaceLanguage(_:)))
+            entry.representedObject = language.rawValue
+            entry.state = config.interfaceLanguage == language.rawValue ? .on : .off
+            interface.addItem(entry)
+        }
+        menu.addItem(submenu(l10n.interfaceLanguage, interface))
+
+        menu.addItem(.separator())
+        menu.addItem(item(l10n.addToVocabulary, #selector(addSelectionToVocabulary)))
+        menu.addItem(item(l10n.editVocabulary, #selector(editVocabulary)))
 
         menu.addItem(.separator())
         menu.addItem(item(l10n.accessibility, #selector(openAccessibilitySettings)))
@@ -304,6 +398,12 @@ final class AppController: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: l10n.quit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         setState(stateIcon, stateText.isEmpty ? l10n.ready : stateText)
+    }
+
+    private func submenu(_ title: String, _ menu: NSMenu) -> NSMenuItem {
+        let entry = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        entry.submenu = menu
+        return entry
     }
 
     private func item(_ title: String, _ action: Selector) -> NSMenuItem {

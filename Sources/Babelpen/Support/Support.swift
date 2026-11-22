@@ -2,10 +2,10 @@ import AppKit
 import Carbon
 import ServiceManagement
 
-/// Plain-text log at ~/Library/Logs/Revisor.log. Only timings and counts,
+/// Plain-text log at ~/Library/Logs/Babelpen.log. Only timings and counts,
 /// never the text you type.
 enum Log {
-    static let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Revisor.log")
+    static let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Babelpen.log")
     private static let formatter = ISO8601DateFormatter()
 
     static func write(_ message: String) {

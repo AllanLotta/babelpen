@@ -2,16 +2,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "Revisor",
+    name: "Babelpen",
     platforms: [.macOS(.v13)],
     products: [
-        .executable(name: "Revisor", targets: ["Revisor"]),
+        .executable(name: "Babelpen", targets: ["Babelpen"]),
     ],
     targets: [
         // Pure logic (diff, prompt, config, strings). No AppKit, fully unit-tested.
-        .target(name: "RevisorCore", path: "Sources/RevisorCore"),
+        .target(name: "BabelpenCore", path: "Sources/BabelpenCore"),
         // The menu bar app: Accessibility, AI engines, UI.
-        .executableTarget(name: "Revisor", dependencies: ["RevisorCore"], path: "Sources/Revisor"),
-        .testTarget(name: "RevisorCoreTests", dependencies: ["RevisorCore"], path: "Tests/RevisorCoreTests"),
+        .executableTarget(name: "Babelpen", dependencies: ["BabelpenCore"], path: "Sources/Babelpen"),
+        .testTarget(name: "BabelpenCoreTests", dependencies: ["BabelpenCore"], path: "Tests/BabelpenCoreTests"),
     ]
 )

@@ -1,5 +1,5 @@
 import Foundation
-import RevisorCore
+import BabelpenCore
 
 /// Runs one CLI process per review: the prompt goes in on stdin, the answer
 /// comes back on stdout (or in a file). Used for Codex and for any custom
@@ -12,43 +12,40 @@ final class OneShotEngine: ProofreadEngine {
 
     private let executable: String?
     private let baseArguments: [String]
-    private let about: String
     /// Codex writes its final message to a file (`-o`); custom commands use stdout.
     private let usesOutputFile: Bool
     private let timeout: TimeInterval = 45
     private var running: Process?
 
-    private init(displayName: String, executable: String?, arguments: [String], about: String, usesOutputFile: Bool) {
+    private init(displayName: String, executable: String?, arguments: [String], usesOutputFile: Bool) {
         self.displayName = displayName
         self.executable = executable
         self.baseArguments = arguments
-        self.about = about
         self.usesOutputFile = usesOutputFile
         if executable == nil { fatalReason = "\(displayName) not found" }
     }
 
     /// OpenAI Codex CLI on your ChatGPT login: `codex exec`, read-only sandbox, ephemeral session.
-    static func codex(model: String, effort: String, about: String) -> OneShotEngine {
+    static func codex(model: String, effort: String) -> OneShotEngine {
         var args = ["exec", "--skip-git-repo-check", "--ephemeral", "-s", "read-only", "--color", "never"]
         if !effort.isEmpty { args += ["-c", "model_reasoning_effort=\(effort)"] }
         if !model.isEmpty { args += ["-m", model] }
-        return OneShotEngine(displayName: "Codex", executable: CLI.find("codex"), arguments: args,
-                             about: about, usesOutputFile: true)
+        return OneShotEngine(displayName: "Codex", executable: CLI.find("codex"), arguments: args, usesOutputFile: true)
     }
 
     /// Any command that reads a prompt on stdin and prints the answer.
-    static func custom(command: [String], about: String) -> OneShotEngine {
+    static func custom(command: [String]) -> OneShotEngine {
         let name = command.first ?? ""
         return OneShotEngine(displayName: name.isEmpty ? "custom command" : name,
                              executable: name.isEmpty ? nil : CLI.find(name),
-                             arguments: Array(command.dropFirst()), about: about, usesOutputFile: false)
+                             arguments: Array(command.dropFirst()), usesOutputFile: false)
     }
 
     func warmUp() {
         if let reason = fatalReason { log(reason) }
     }
 
-    func proofread(_ text: String, completion: @escaping (String?) -> Void) {
+    func proofread(_ text: String, context: PromptContext, completion: @escaping (String?) -> Void) {
         guard let executable, fatalReason == nil else { completion(nil); return }
         let outputFile = CLI.scratchDirectory.appendingPathComponent("answer-\(UUID().uuidString).txt")
         var args = baseArguments
@@ -65,7 +62,7 @@ final class OneShotEngine: ProofreadEngine {
         p.standardError = FileHandle.nullDevice
 
         var stdout = Data()
-        let readQueue = DispatchQueue(label: "revisor.oneshot.read")
+        let readQueue = DispatchQueue(label: "babelpen.oneshot.read")
         outPipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
             if data.isEmpty { handle.readabilityHandler = nil; return }
@@ -103,7 +100,7 @@ final class OneShotEngine: ProofreadEngine {
             finish(nil)
             return
         }
-        let prompt = Prompt.oneShot(text, about: about)
+        let prompt = Prompt.oneShot(text, context: context)
         try? inPipe.fileHandleForWriting.write(contentsOf: Data(prompt.utf8))
         try? inPipe.fileHandleForWriting.close()
 
