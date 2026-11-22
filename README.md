@@ -268,8 +268,8 @@ docs/demo/               # demo pages used for the recordings
 **Add an engine:** implement `ProofreadEngine` (`Sources/Babelpen/AI/Engine.swift`) and register it in `EngineFactory`.
 
 **Releasing:** bump `VERSION`, add a `CHANGELOG.md` section, push a `vX.Y.Z` tag. GitHub Actions tests, builds a
-universal app, packages `.dmg` + `.zip` and publishes the release. Add the signing secrets listed in
-`.github/workflows/release.yml` to get Developer ID signed, notarized builds.
+universal app, packages `.dmg` + `.zip` and publishes the release. For Developer ID signed, notarized builds,
+run `./scripts/setup-signing.sh` once (it explains what it needs and stores the GitHub secrets).
 
 PRs welcome. Please run `swift test` before opening one.
 

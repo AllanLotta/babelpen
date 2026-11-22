@@ -41,7 +41,7 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN"
           security unlock-keychain -p ci "$KEYCHAIN"
           echo "$P12" | base64 --decode > $RUNNER_TEMP/cert.p12
-          security import $RUNNER_TEMP/cert.p12 -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security import $RUNNER_TEMP/cert.p12 -P "$P12_PASSWORD" -f pkcs12 -k "$KEYCHAIN" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -k ci "$KEYCHAIN" >/dev/null
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
 
@@ -62,6 +62,13 @@ jobs:
           ditto -c -k --keepParent Babelpen.app notarize.zip
           xcrun notarytool submit notarize.zip --apple-id "$APPLE_ID" --team-id "$TEAM_ID" --password "$PASSWORD" --wait
           xcrun stapler staple Babelpen.app
+
+      - name: Verify signature
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          codesign --verify --strict --verbose=2 Babelpen.app
+          spctl --assess --type execute --verbose=2 Babelpen.app
+          xcrun stapler validate Babelpen.app
 
       - name: Package
         run: ./scripts/package.sh
