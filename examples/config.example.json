@@ -1,0 +1,17 @@
+{
+  "provider": "claude",
+  "model": "claude-haiku-5-5",
+  "effort": "low",
+  "about": "Software engineer. Writes in English and Spanish, casual tone in chat.",
+  "debounceSeconds": 1.0,
+  "minCharacters": 8,
+  "maxCharacters": 2500,
+  "language": "",
+  "ignoredApps": [
+    "com.apple.Terminal",
+    "com.googlecode.iterm2",
+    "com.microsoft.VSCode",
+    "com.apple.dt.Xcode",
+    "com.1password.1password"
+  ]
+}

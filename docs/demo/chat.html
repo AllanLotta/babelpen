@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Revisor demo: chat</title>
+<style>
+  :root { --bg:#1a1d21; --side:#19171d; --line:#2c2f34; --text:#d1d2d3; --muted:#9a9b9e; --accent:#4a9eff; }
+  * { box-sizing: border-box; }
+  body { margin:0; height:100vh; display:flex; font:15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); }
+  aside { width:220px; background:var(--side); border-right:1px solid var(--line); padding:18px 12px; }
+  aside h1 { font-size:17px; margin:0 8px 18px; color:#fff; }
+  aside .item { padding:5px 10px; border-radius:6px; color:var(--muted); }
+  aside .item.on { background:#1164a3; color:#fff; }
+  main { flex:1; display:flex; flex-direction:column; }
+  header { padding:14px 20px; border-bottom:1px solid var(--line); font-weight:700; color:#fff; }
+  .msgs { flex:1; padding:16px 20px; overflow:auto; display:flex; flex-direction:column; justify-content:flex-end; gap:14px; }
+  .msg { display:flex; gap:10px; }
+  .av { width:36px; height:36px; border-radius:8px; flex:none; display:grid; place-items:center; font-weight:700; color:#fff; }
+  .who { font-weight:700; color:#fff; } .who span { font-weight:400; color:var(--muted); font-size:12px; margin-left:6px; }
+  .composer { margin:0 20px 20px; border:1px solid #565856; border-radius:10px; padding:10px 12px; }
+  textarea { width:100%; border:0; outline:0; resize:none; background:transparent; color:var(--text); font:inherit; height:48px; }
+  .hint { color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<aside>
+  <h1>Acme Inc.</h1>
+  <div class="item">#announcements</div>
+  <div class="item on">#mobile-team</div>
+  <div class="item">#design</div>
+  <div class="item">#random</div>
+</aside>
+<main>
+  <header># mobile-team</header>
+  <div class="msgs">
+    <div class="msg"><div class="av" style="background:#e8912d">M</div><div><div class="who">Maya<span>10:42</span></div>Morning! How's the onboarding redesign going?</div></div>
+    <div class="msg"><div class="av" style="background:#2bac76">L</div><div><div class="who">Leo<span>10:44</span></div>QA build is up on TestFlight if anyone wants to try it 🚀</div></div>
+  </div>
+  <div class="composer">
+    <textarea id="box" placeholder="Message #mobile-team"></textarea>
+    <div class="hint">Return to send</div>
+  </div>
+</main>
+<script>
+  // Types a message like a person would, so Revisor can be recorded in action.
+  const text = new URLSearchParams(location.search).get('text') ||
+    "hey team, i finished the new onboarding flow but i didnt had time to write the tests yet, i will do it tomorow morning";
+  const box = document.getElementById('box');
+  box.focus();
+  let i = 0;
+  setTimeout(function type() {
+    if (i >= text.length) return;
+    box.value += text[i++];
+    box.selectionStart = box.selectionEnd = box.value.length;
+    setTimeout(type, 28 + Math.random() * 40);
+  }, +(new URLSearchParams(location.search).get('delay') || 1200));
+</script>
+</body>
+</html>

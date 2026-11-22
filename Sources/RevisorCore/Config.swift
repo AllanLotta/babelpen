@@ -1,0 +1,107 @@
+import Foundation
+
+/// User settings, stored as JSON in ~/Library/Application Support/Revisor/config.json.
+/// Every key is optional in the file; missing keys fall back to the defaults below.
+public struct Config: Codable, Equatable {
+    public enum Provider: String, Codable, CaseIterable {
+        case claude   // Claude Code CLI (`claude`), your Claude plan
+        case codex    // OpenAI Codex CLI (`codex`), your ChatGPT plan
+        case command  // any CLI that reads the prompt on stdin and prints the answer
+    }
+
+    /// Which local AI CLI does the proofreading.
+    public var provider: Provider = .claude
+    /// Model passed to the CLI. Empty = the CLI's default.
+    public var model: String = ""
+    /// Reasoning effort passed to the CLI ("low" is plenty for proofreading).
+    public var effort: String = "low"
+    /// For `provider: "command"`: executable and arguments, e.g. ["ollama", "run", "llama3.2"].
+    public var command: [String] = []
+    /// Optional context for the model, e.g. "Software engineer, writes in English and Spanish".
+    public var about: String = ""
+    /// Seconds of no typing before a review starts.
+    public var debounceSeconds: Double = 1.0
+    public var minCharacters: Int = 8
+    public var maxCharacters: Int = 2500
+    /// Bundle identifiers where Revisor stays quiet.
+    public var ignoredApps: [String] = Config.defaultIgnoredApps
+    /// UI language: "en", "pt", or empty to follow the system.
+    public var language: String = ""
+
+    public static let defaultIgnoredApps = [
+        "com.apple.Terminal", "com.googlecode.iterm2", "com.mitchellh.ghostty", "dev.warp.Warp-Stable",
+        "com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92", "com.apple.dt.Xcode",
+        "com.jetbrains.intellij", "com.google.android.studio", "dev.zed.Zed",
+        "com.1password.1password", "com.apple.keychainaccess", "com.bitwarden.desktop", "com.apple.Passwords",
+    ]
+
+    public init() {}
+
+    private enum Keys: String, CodingKey {
+        case provider, model, effort, command, about, debounceSeconds, minCharacters, maxCharacters, ignoredApps, language
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        let d = Config()
+        provider = (try? c.decodeIfPresent(Provider.self, forKey: .provider)) ?? d.provider
+        model = try c.decodeIfPresent(String.self, forKey: .model) ?? d.model
+        effort = try c.decodeIfPresent(String.self, forKey: .effort) ?? d.effort
+        command = try c.decodeIfPresent([String].self, forKey: .command) ?? d.command
+        about = try c.decodeIfPresent(String.self, forKey: .about) ?? d.about
+        debounceSeconds = try c.decodeIfPresent(Double.self, forKey: .debounceSeconds) ?? d.debounceSeconds
+        minCharacters = try c.decodeIfPresent(Int.self, forKey: .minCharacters) ?? d.minCharacters
+        maxCharacters = try c.decodeIfPresent(Int.self, forKey: .maxCharacters) ?? d.maxCharacters
+        ignoredApps = try c.decodeIfPresent([String].self, forKey: .ignoredApps) ?? d.ignoredApps
+        language = try c.decodeIfPresent(String.self, forKey: .language) ?? d.language
+    }
+
+    public static func decode(_ data: Data) throws -> Config { try JSONDecoder().decode(Config.self, from: data) }
+
+    public func encoded() throws -> Data {
+        let e = JSONEncoder()
+        e.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        return try e.encode(self)
+    }
+}
+
+/// Loads and saves the config file.
+public final class ConfigStore {
+    public let url: URL
+    public private(set) var config = Config()
+
+    public init(url: URL = ConfigStore.defaultURL) { self.url = url }
+
+    public static var defaultURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Revisor/config.json")
+    }
+
+    /// Reads the file, creating it with defaults on first run. Returns an error
+    /// message when the file exists but can't be parsed (defaults are used then).
+    @discardableResult
+    public func load() -> String? {
+        guard let data = try? Data(contentsOf: url) else {
+            config = Config()
+            save()
+            return nil
+        }
+        do {
+            config = try Config.decode(data)
+            return nil
+        } catch {
+            config = Config()
+            return "config.json: \(error.localizedDescription)"
+        }
+    }
+
+    public func update(_ change: (inout Config) -> Void) {
+        change(&config)
+        save()
+    }
+
+    public func save() {
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if let data = try? config.encoded() { try? data.write(to: url, options: .atomic) }
+    }
+}
