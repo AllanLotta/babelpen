@@ -6,6 +6,7 @@
 #   A) You created the certificate on developer.apple.com from a CSR made with
 #      `./scripts/setup-signing.sh --csr` and downloaded the .cer:
 #        ./scripts/setup-signing.sh ~/Downloads/developerID_application.cer
+#      (add --install-only to just install it in the keychain and stop)
 #
 #   B) You exported an existing Developer ID Application identity from
 #      Keychain Access as a .p12 (only that certificate):
@@ -55,8 +56,13 @@ if [[ "$INPUT" == *.cer || "$INPUT" == *.crt || "$INPUT" == *.pem ]]; then
   pkcs12 -export -in "$WORK/cert.pem" -inkey "$STORE/devid.key" -out "$P12" -passout "pass:$P12_PASSWORD" \
     -name "$(echo "$SUBJECT" | sed -E 's/.*CN ?= ?([^,/]+\([A-Z0-9]+\)).*/\1/')"
   chmod 600 "$P12"
-  security import "$P12" -k "$HOME/Library/Keychains/login.keychain-db" -P "$P12_PASSWORD" -T /usr/bin/codesign >/dev/null
-  echo "✓ Developer ID installed in your login keychain"
+  if security find-identity -v -p codesigning | grep -q "\"$(echo "$SUBJECT" | sed -E 's/.*CN ?= ?([^,/]+\([A-Z0-9]+\)).*/\1/')\""; then
+    echo "✓ Developer ID already in your login keychain"
+  else
+    security import "$P12" -k "$HOME/Library/Keychains/login.keychain-db" -P "$P12_PASSWORD" -T /usr/bin/codesign >/dev/null
+    echo "✓ Developer ID installed in your login keychain"
+  fi
+  [[ ${2:-} == "--install-only" ]] && exit 0
 else
   # B) exported identity.
   P12="$INPUT"
