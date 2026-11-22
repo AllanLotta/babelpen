@@ -44,9 +44,8 @@ Then:
 
 A ✎ appears in your menu bar. Start typing anywhere.
 
-> **About the release builds:** they aren't notarized by Apple yet. The install script removes the download
-> quarantine flag for Babelpen only. With the `.dmg`, macOS asks you to confirm in System Settings › Privacy &
-> Security › "Open Anyway" the first time. Prefer to build it yourself? See [Build from source](#build-from-source).
+> Releases are signed with a Developer ID and **notarized by Apple**, so they open with a double click and keep the
+> Accessibility permission across updates. Prefer to build it yourself? See [Build from source](#build-from-source).
 
 ## Why
 
@@ -222,7 +221,8 @@ Please [open an issue](https://github.com/AllanLotta/babelpen/issues) with the a
 - [ ] Accept fixes one by one instead of the whole text
 - [ ] Review only the paragraph around the caret in long documents (emails with quoted history)
 - [ ] Optional "rewrite naturally" mode for language learners
-- [ ] Notarized releases and a Homebrew cask
+- [x] Signed, notarized releases
+- [ ] Homebrew cask
 - [ ] Per-app settings
 - [ ] More interface languages (PRs welcome, it's one table)
 

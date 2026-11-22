@@ -7,7 +7,7 @@ Revisor is now **Babelpen**: proofreading for every language, in every app.
 - **Writing languages:** pick the languages you write in from the menu (defaults to your system languages). Text is always fixed in its own language, never translated.
 - **Your vocabulary:** words Babelpen must never touch (names, jargon, slang). Select a word and press ⌃⌥V, or edit `vocabulary.txt`.
 - **Interface in 6 languages:** English, Português, Español, Français, Deutsch, Italiano, switchable from the menu.
-- **One-line install** and prebuilt universal releases (Apple Silicon + Intel) as `.dmg` and `.zip`.
+- **One-line install** and prebuilt universal releases (Apple Silicon + Intel) as `.dmg` and `.zip`, Developer ID signed and notarized by Apple.
 - Apply only pastes into the app the suggestion came from.
 - Keeps working while the menu is open.
 

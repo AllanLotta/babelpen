@@ -3,8 +3,8 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/AllanLotta/babelpen/main/install.sh | bash
 #
-# Releases are not notarized yet, so this clears the download quarantine flag
-# for Babelpen.app only. Read this script before running it, it's short.
+# Releases are Developer ID signed and notarized by Apple. Read this script
+# before running it, it's short.
 set -euo pipefail
 
 REPO="AllanLotta/babelpen"
