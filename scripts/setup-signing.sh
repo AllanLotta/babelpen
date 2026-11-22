@@ -20,6 +20,7 @@
 # "babelpen"), stores the six GitHub Actions secrets the release workflow uses,
 # and starts a release build. Secrets are typed hidden and piped straight to gh.
 set -euo pipefail
+export GH_PAGER=cat PAGER=cat
 cd "$(dirname "$0")/.."
 
 STORE="$HOME/.babelpen-signing"     # private key + generated .p12 password (mode 700)
