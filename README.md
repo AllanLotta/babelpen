@@ -4,7 +4,8 @@
 
 ### Don't panic. Your typos are handled, in any language, in any app.
 
-**AI proofreading for every macOS text field, powered by the Claude or ChatGPT plan you already pay for.**
+**The free, open-source Grammarly alternative for Mac. AI proofreading, rewriting and translation for every macOS text
+field, powered by the Claude or ChatGPT plan you already pay for.**
 
 A tiny native menu bar app (~400 KB, Swift) that fixes what you write in Slack, Gmail, GitHub, Notes or anywhere else,
 the moment you stop typing, in whatever language you're writing. It runs on **Claude Code** or **Codex** on your own
@@ -15,6 +16,8 @@ machine: no API keys, no extra subscription, no new company reading everything y
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black?logo=apple)
 ![Swift](https://img.shields.io/badge/Swift-5.10-F05138?logo=swift&logoColor=white)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+**[Website](https://allanlotta.github.io/babelpen/) · [Download](https://github.com/AllanLotta/babelpen/releases/latest) · [Try the demo](https://allanlotta.github.io/babelpen/#demo)**
 
 <img src="docs/images/demo-chat.gif" alt="Babelpen fixing chat messages in English, Spanish and French" width="880">
 
