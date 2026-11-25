@@ -25,6 +25,10 @@ public struct L10n {
         case systemDefault, editVocabulary, addToVocabulary, addedToVocabulary, alreadyInVocabulary, nothingSelected
         case accessibility, launchAtLogin, launchAtLoginApprove, openConfig, reloadConfig, openLog, quit
         case apply, dismiss
+        case improve, formal, casual, translateInto, rewriting, translating, improvedHeader, formalHeader, casualHeader
+        case translatedHeader, writtenIn, rewriteHeader, copy, copied, close, translateChip
+        case rewriteMenu, translateMenu, translateToMenu, offerTranslationMenu, translateSelectionMenu
+        case nothingToTranslate, clickTextField
     }
 
     public let language: Language
@@ -88,7 +92,33 @@ public struct L10n {
     // Suggestion card
     public var apply: String { string(.apply) + "  ⌃⌥G" }
     public var dismiss: String { string(.dismiss) }
-    public func cardHeader(_ n: Int) -> String { "BABELPEN · " + fixes(n).uppercased(with: Locale(identifier: language.rawValue)) }
+    public func cardHeader(_ n: Int) -> String { header(fixes(n)) }
+    public func header(_ text: String) -> String { "BABELPEN · " + text.uppercased(with: Locale(identifier: language.rawValue)) }
+
+    // Rewrite and translate
+    public var improve: String { "✨ " + string(.improve) }
+    public var formal: String { string(.formal) }
+    public var casual: String { string(.casual) }
+    public func translateInto(_ languageName: String) -> String { fill(.translateInto, ["x": languageName]) }
+    public var rewriting: String { string(.rewriting) }
+    public var translating: String { string(.translating) }
+    public var improvedHeader: String { string(.improvedHeader) }
+    public var formalHeader: String { string(.formalHeader) }
+    public var casualHeader: String { string(.casualHeader) }
+    public func translatedHeader(_ languageName: String) -> String { fill(.translatedHeader, ["x": languageName]) }
+    public func writtenIn(_ languageName: String) -> String { fill(.writtenIn, ["x": languageName]) }
+    public var rewriteHeader: String { string(.rewriteHeader) }
+    public var copy: String { string(.copy) }
+    public var copied: String { string(.copied) }
+    public var close: String { string(.close) }
+    public var translateChip: String { "🌐 " + string(.translateChip) + "  ⌃⌥T" }
+    public var rewriteMenu: String { string(.rewriteMenu) + "  ⌃⌥E" }
+    public var translateMenu: String { string(.translateMenu) + "  ⌃⌥T" }
+    public var translateToMenu: String { string(.translateToMenu) }
+    public var offerTranslationMenu: String { string(.offerTranslationMenu) }
+    public var translateSelectionMenu: String { string(.translateSelectionMenu) }
+    public var nothingToTranslate: String { string(.nothingToTranslate) }
+    public var clickTextField: String { string(.clickTextField) }
 
     // swiftlint:disable line_length
     static let table: [Key: [Language: String]] = [
@@ -126,6 +156,29 @@ public struct L10n {
         .quit: [.en: "Quit Babelpen", .pt: "Sair do Babelpen", .es: "Salir de Babelpen", .fr: "Quitter Babelpen", .de: "Babelpen beenden", .it: "Esci da Babelpen"],
         .apply: [.en: "Apply", .pt: "Aplicar", .es: "Aplicar", .fr: "Appliquer", .de: "Übernehmen", .it: "Applica"],
         .dismiss: [.en: "Dismiss", .pt: "Ignorar", .es: "Descartar", .fr: "Ignorer", .de: "Verwerfen", .it: "Ignora"],
+        .improve: [.en: "Improve", .pt: "Melhorar", .es: "Mejorar", .fr: "Améliorer", .de: "Verbessern", .it: "Migliora"],
+        .formal: [.en: "Formal", .pt: "Formal", .es: "Formal", .fr: "Formel", .de: "Förmlich", .it: "Formale"],
+        .casual: [.en: "Casual", .pt: "Casual", .es: "Casual", .fr: "Détendu", .de: "Locker", .it: "Informale"],
+        .translateInto: [.en: "→ {x}", .pt: "→ {x}", .es: "→ {x}", .fr: "→ {x}", .de: "→ {x}", .it: "→ {x}"],
+        .rewriting: [.en: "Rewriting…", .pt: "Reescrevendo…", .es: "Reescribiendo…", .fr: "Réécriture…", .de: "Wird umgeschrieben…", .it: "Riscrittura…"],
+        .translating: [.en: "Translating…", .pt: "Traduzindo…", .es: "Traduciendo…", .fr: "Traduction…", .de: "Wird übersetzt…", .it: "Traduzione…"],
+        .improvedHeader: [.en: "Improved", .pt: "Melhorado", .es: "Mejorado", .fr: "Amélioré", .de: "Verbessert", .it: "Migliorato"],
+        .formalHeader: [.en: "More formal", .pt: "Mais formal", .es: "Más formal", .fr: "Plus formel", .de: "Förmlicher", .it: "Più formale"],
+        .casualHeader: [.en: "More casual", .pt: "Mais casual", .es: "Más casual", .fr: "Plus détendu", .de: "Lockerer", .it: "Più informale"],
+        .translatedHeader: [.en: "In {x}", .pt: "Em {x}", .es: "En {x}", .fr: "En {x}", .de: "Auf {x}", .it: "In {x}"],
+        .writtenIn: [.en: "Written in {x}", .pt: "Escrito em {x}", .es: "Escrito en {x}", .fr: "Écrit en {x}", .de: "Auf {x} geschrieben", .it: "Scritto in {x}"],
+        .rewriteHeader: [.en: "Rewrite", .pt: "Reescrever", .es: "Reescribir", .fr: "Réécrire", .de: "Umschreiben", .it: "Riscrivi"],
+        .copy: [.en: "Copy", .pt: "Copiar", .es: "Copiar", .fr: "Copier", .de: "Kopieren", .it: "Copia"],
+        .copied: [.en: "Copied", .pt: "Copiado", .es: "Copiado", .fr: "Copié", .de: "Kopiert", .it: "Copiato"],
+        .close: [.en: "Close", .pt: "Fechar", .es: "Cerrar", .fr: "Fermer", .de: "Schließen", .it: "Chiudi"],
+        .translateChip: [.en: "Translate", .pt: "Traduzir", .es: "Traducir", .fr: "Traduire", .de: "Übersetzen", .it: "Traduci"],
+        .rewriteMenu: [.en: "Rewrite Field…", .pt: "Reescrever campo…", .es: "Reescribir campo…", .fr: "Réécrire le champ…", .de: "Feld umschreiben…", .it: "Riscrivi campo…"],
+        .translateMenu: [.en: "Translate", .pt: "Traduzir", .es: "Traducir", .fr: "Traduire", .de: "Übersetzen", .it: "Traduci"],
+        .translateToMenu: [.en: "Translate Drafts To", .pt: "Traduzir rascunhos para", .es: "Traducir borradores a", .fr: "Traduire les brouillons en", .de: "Entwürfe übersetzen nach", .it: "Traduci bozze in"],
+        .offerTranslationMenu: [.en: "Offer Translation While Typing", .pt: "Oferecer tradução ao digitar", .es: "Ofrecer traducción al escribir", .fr: "Proposer la traduction en écrivant", .de: "Beim Schreiben Übersetzung anbieten", .it: "Proponi traduzione mentre scrivi"],
+        .translateSelectionMenu: [.en: "Translate Button on Selected Text", .pt: "Botão de traduzir no texto selecionado", .es: "Botón de traducir en el texto seleccionado", .fr: "Bouton Traduire sur le texte sélectionné", .de: "Übersetzen-Knopf bei markiertem Text", .it: "Pulsante Traduci sul testo selezionato"],
+        .nothingToTranslate: [.en: "Select some text first", .pt: "Selecione um texto antes", .es: "Selecciona un texto primero", .fr: "Sélectionnez d’abord du texte", .de: "Zuerst Text markieren", .it: "Seleziona prima del testo"],
+        .clickTextField: [.en: "Click a text field first", .pt: "Clique num campo de texto antes", .es: "Haz clic en un campo de texto primero", .fr: "Cliquez d’abord dans un champ de texte", .de: "Zuerst in ein Textfeld klicken", .it: "Fai clic prima in un campo di testo"],
     ]
     // swiftlint:enable line_length
 }

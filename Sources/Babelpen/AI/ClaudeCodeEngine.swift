@@ -7,13 +7,15 @@ import BabelpenCore
 /// Starting the CLI takes a few seconds; a warm process answers in under a
 /// second with Haiku. Requests are answered in order, one `result` line each.
 /// The process is recycled every `maxRequests` to keep its context small.
-final class ClaudeCodeEngine: ProofreadEngine {
+final class ClaudeCodeEngine: AIEngine {
     let displayName = "Claude Code"
     private(set) var fatalReason: String?
     var onLog: ((String) -> Void)?
 
     private let model: String
     private let effort: String
+    private let system: String
+    private let label: String
     private let maxRequests = 20
     private let timeout: TimeInterval = 25
 
@@ -24,14 +26,16 @@ final class ClaudeCodeEngine: ProofreadEngine {
     private var served = 0
     private var nextID = 0
 
-    init(model: String, effort: String) {
+    init(model: String, effort: String, system: String, label: String) {
         self.model = model
         self.effort = effort
+        self.system = system
+        self.label = label
     }
 
     func warmUp() { if process == nil { start() } }
 
-    func proofread(_ text: String, context: PromptContext, completion: @escaping (String?) -> Void) {
+    func ask(_ text: String, completion: @escaping (String?) -> Void) {
         if fatalReason != nil { completion(nil); return }
         if process != nil, served >= maxRequests, pending.isEmpty { stopProcess() }
         if process == nil { start() }
@@ -43,7 +47,7 @@ final class ClaudeCodeEngine: ProofreadEngine {
         served += 1
         let message: [String: Any] = [
             "type": "user",
-            "message": ["role": "user", "content": Prompt.userMessage(text, context: context)],
+            "message": ["role": "user", "content": text],
             "parent_tool_use_id": NSNull(),
         ]
         var line = (try? JSONSerialization.data(withJSONObject: message)) ?? Data()
@@ -80,7 +84,7 @@ final class ClaudeCodeEngine: ProofreadEngine {
         var args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
                     "--model", model,
                     "--setting-sources", "", "--strict-mcp-config", "--disable-slash-commands",
-                    "--system-prompt", Prompt.system, "--tools", "", "--no-session-persistence"]
+                    "--system-prompt", system, "--tools", "", "--no-session-persistence"]
         if !effort.isEmpty { args += ["--effort", effort] }
         p.arguments = args
         p.environment = CLI.environment(binary: binary)
@@ -104,7 +108,7 @@ final class ClaudeCodeEngine: ProofreadEngine {
         p.terminationHandler = { [weak self] proc in
             DispatchQueue.main.async {
                 guard let self, self.process === proc else { return }
-                self.log("claude exited (\(proc.terminationStatus))")
+                self.log("claude exited (\(self.label), \(proc.terminationStatus))")
                 self.failAllAndStop()
             }
         }
@@ -112,7 +116,7 @@ final class ClaudeCodeEngine: ProofreadEngine {
             try p.run()
             process = p
             input = inPipe.fileHandleForWriting
-            log("claude started (pid \(p.processIdentifier), model \(model))")
+            log("claude started (\(label), pid \(p.processIdentifier), model \(model))")
         } catch {
             fatalReason = "could not start claude"
             log("could not start \(binary): \(error)")

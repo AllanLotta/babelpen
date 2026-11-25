@@ -29,6 +29,18 @@ public struct Config: Codable, Equatable {
     public var languages: [String] = []
     /// Interface language: "en", "pt", "es", "fr", "de", "it", or empty to follow the system.
     public var interfaceLanguage: String = ""
+    /// Model for rewrites, translations and explanations. Empty = same as `model`.
+    public var assistModel: String = ""
+    /// The language you read best (explanations of selected text). Empty = interface language.
+    public var readingLanguage: String = ""
+    /// Where drafts get translated to. Empty = first writing language that isn't your reading language.
+    public var translateTo: String = ""
+    /// Offer a translation when a draft is in another language than `translateTo`.
+    public var offerTranslation: Bool = true
+    /// Bundle identifiers where that offer never shows (it's still one ⌃⌥T away).
+    public var offerTranslationIgnoredApps: [String] = []
+    /// Show a "Translate" button when you select text written in another language.
+    public var translateSelection: Bool = true
 
     public static let defaultIgnoredApps = [
         "com.apple.Terminal", "com.googlecode.iterm2", "com.mitchellh.ghostty", "dev.warp.Warp-Stable",
@@ -42,6 +54,7 @@ public struct Config: Codable, Equatable {
     private enum Keys: String, CodingKey {
         case provider, model, effort, command, about, debounceSeconds, minCharacters, maxCharacters, ignoredApps
         case languages, interfaceLanguage
+        case assistModel, readingLanguage, translateTo, offerTranslation, offerTranslationIgnoredApps, translateSelection
         case language // 0.1 name of interfaceLanguage, still read
     }
 
@@ -60,6 +73,13 @@ public struct Config: Codable, Equatable {
         languages = try c.decodeIfPresent([String].self, forKey: .languages) ?? d.languages
         interfaceLanguage = try c.decodeIfPresent(String.self, forKey: .interfaceLanguage)
             ?? c.decodeIfPresent(String.self, forKey: .language) ?? d.interfaceLanguage
+        assistModel = try c.decodeIfPresent(String.self, forKey: .assistModel) ?? d.assistModel
+        readingLanguage = try c.decodeIfPresent(String.self, forKey: .readingLanguage) ?? d.readingLanguage
+        translateTo = try c.decodeIfPresent(String.self, forKey: .translateTo) ?? d.translateTo
+        offerTranslation = try c.decodeIfPresent(Bool.self, forKey: .offerTranslation) ?? d.offerTranslation
+        offerTranslationIgnoredApps = try c.decodeIfPresent([String].self, forKey: .offerTranslationIgnoredApps)
+            ?? d.offerTranslationIgnoredApps
+        translateSelection = try c.decodeIfPresent(Bool.self, forKey: .translateSelection) ?? d.translateSelection
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -75,6 +95,12 @@ public struct Config: Codable, Equatable {
         try c.encode(ignoredApps, forKey: .ignoredApps)
         try c.encode(languages, forKey: .languages)
         try c.encode(interfaceLanguage, forKey: .interfaceLanguage)
+        try c.encode(assistModel, forKey: .assistModel)
+        try c.encode(readingLanguage, forKey: .readingLanguage)
+        try c.encode(translateTo, forKey: .translateTo)
+        try c.encode(offerTranslation, forKey: .offerTranslation)
+        try c.encode(offerTranslationIgnoredApps, forKey: .offerTranslationIgnoredApps)
+        try c.encode(translateSelection, forKey: .translateSelection)
     }
 
     public static func decode(_ data: Data) throws -> Config { try JSONDecoder().decode(Config.self, from: data) }

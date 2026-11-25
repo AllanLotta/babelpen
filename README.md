@@ -59,10 +59,10 @@ on your machine, logged in. Babelpen turns them into a system-wide proofreader:
   on purpose, so it never falls back to metered API billing.
 - ⚡ **Fast.** With Claude Code it keeps one warm process; Haiku answers in **~0.7 s**.
 - 🗣️ **Keeps your voice.** Minimal edits: spelling, grammar, accents, punctuation, clearly unnatural phrasing.
-  No rewriting, no "make it formal". Casual stays casual.
+  Casual stays casual. Rewrites and translations only happen when you ask for them.
 - 📖 **Knows your words.** Names, products, jargon and slang go in your vocabulary and are never "corrected".
 - 🪶 **Out of your way.** Nothing happens until you pause. One shortcut applies the fix, and your app's own ⌘Z undoes it.
-- 🔍 **Small and auditable.** About 1,700 lines of Swift, zero dependencies, no telemetry, no server.
+- 🔍 **Small and auditable.** About 2,500 lines of Swift, zero dependencies, no telemetry, no server.
 
 ## Features
 
@@ -71,6 +71,9 @@ on your machine, logged in. Babelpen turns them into a system-wide proofreader:
 | ✍️ **Real-time review** | Reviews the focused text field 1 s after you stop typing |
 | 🔍 **Clear diff card** | Red strikethrough is removed, blue is added, right next to the field |
 | ⚡ **One-key apply** | <kbd>⌃</kbd><kbd>⌥</kbd><kbd>G</kbd> applies, <kbd>⌃</kbd><kbd>⌥</kbd><kbd>R</kbd> reviews right now |
+| ✨ **Rewrite on demand** | **Improve**, **Formal** or **Casual** from the same card, shown as a diff before you apply |
+| 🔁 **Translate your drafts** | Write in your language, apply it in another one. Babelpen offers it when it notices |
+| 🌐 **Translate what you read** | Select a message written in another language: a **Translate** button shows the translation and what it implies |
 | 🌍 **Writing languages** | Pick the languages you write in (defaults to your system's); any language works |
 | 📖 **Your vocabulary** | Select a word, press <kbd>⌃</kbd><kbd>⌥</kbd><kbd>V</kbd>: Babelpen will never touch it again |
 | 🗣️ **Interface in 6 languages** | English, Português, Español, Français, Deutsch, Italiano |
@@ -90,7 +93,10 @@ Just type. When you pause, Babelpen reviews the text and, if something's off, sh
 |---|---|
 | <kbd>⌃</kbd><kbd>⌥</kbd><kbd>G</kbd> | Apply the suggestion (or click **Apply**) |
 | <kbd>⌃</kbd><kbd>⌥</kbd><kbd>R</kbd> | Review the current field now |
+| <kbd>⌃</kbd><kbd>⌥</kbd><kbd>E</kbd> | Rewrite the current field: Improve, Formal, Casual or translate |
+| <kbd>⌃</kbd><kbd>⌥</kbd><kbd>T</kbd> | Translate the selected text, or your draft when nothing is selected |
 | <kbd>⌃</kbd><kbd>⌥</kbd><kbd>V</kbd> | Add the selected word to your vocabulary |
+| <kbd>⌃</kbd><kbd>⌥</kbd><kbd>B</kbd> | Open the Babelpen menu at the mouse pointer (handy when the ✎ is hidden behind the notch) |
 | <kbd>⌘</kbd><kbd>Z</kbd> | Undo, handled by the app you're typing in |
 
 The menu bar icon tells you what's going on:
@@ -104,7 +110,36 @@ The menu bar icon tells you what's going on:
 | `✎⏸` | Paused |
 | `✎⚠` | Needs permission, or the engine failed (see **Open Log**) |
 
-From the menu: pause, switch engine, writing languages, interface language, vocabulary, launch at login, config and log.
+From the menu: pause, switch engine, writing languages, translation, interface language, vocabulary, launch at login,
+config and log.
+
+### Rewrite and translate
+
+Proofreading never changes your tone or your language. When you want more, every card has a row of buttons:
+
+| Button | What you get |
+|---|---|
+| **✨ Improve** | Clearer and more natural: errors fixed, tangled sentences untangled, filler cut. Same tone and language |
+| **Formal** | More polished, as for an email to a manager or a client. Concise, not stiff |
+| **Casual** | Warmer and friendlier, as a chat message to a teammate |
+| **→ English** | A natural translation into the language you translate drafts to, keeping your tone |
+
+The result shows up as a diff (or as the translation) and nothing changes until you press **Apply**
+(<kbd>⌃</kbd><kbd>⌥</kbd><kbd>G</kbd>). Your app's ⌘Z undoes it.
+
+When there's nothing to fix but the draft is in another language than the one you translate to (you wrote it in
+Portuguese, the channel speaks English), a small card offers the translation. Dismiss it once and it stays quiet in
+that field. Press <kbd>⌃</kbd><kbd>⌥</kbd><kbd>E</kbd> to get the buttons for any field, any time.
+
+### Translate what you read
+
+Select text written by someone else (a Slack message, an email, a web page) in a language other than the one you
+read best, and a **🌐 Translate** button appears next to it. Click it, or press <kbd>⌃</kbd><kbd>⌥</kbd><kbd>T</kbd>,
+for a translation plus a short note on what the author means: implied requests, tone, idioms, slang, abbreviations.
+**Copy** puts the translation on your clipboard.
+
+Text in your own reading language gets no button (<kbd>⌃</kbd><kbd>⌥</kbd><kbd>T</kbd> still explains it in plain
+words). Turn the button off in the menu if you'd rather only use the shortcut.
 
 ### Languages
 
@@ -114,6 +149,12 @@ There are two separate settings, both in the menu:
   the one you're learning (say, Italian) and remove the ones you don't use. It's a hint for accents, spelling
   conventions and ambiguous words; text in any language still gets fixed in that language.
 - **Interface Language:** the language of Babelpen's own menus and buttons. Follows your system by default.
+- **Translate Drafts To:** where **→** translates your drafts. Defaults to your first writing language that isn't
+  your reading language (or English).
+- **Reading language** (`readingLanguage` in the config): the language translations of selected text are written in.
+  Defaults to the interface language.
+
+Language detection for the translation offer and the Translate button runs on your Mac (Apple's NaturalLanguage).
 
 ### Vocabulary
 
@@ -166,6 +207,12 @@ Settings live in `~/Library/Application Support/Babelpen/config.json` (menu › 
 | `debounceSeconds` | `1.0` | Pause before a review starts |
 | `minCharacters` / `maxCharacters` | `8` / `2500` | Texts outside this range are skipped |
 | `ignoredApps` | terminals, IDEs, password managers | Bundle IDs where Babelpen stays quiet |
+| `assistModel` | `""` | Model for rewrites and translations. Empty = same as `model` |
+| `readingLanguage` | `""` | The language you read best (translations of selected text). Empty = interface language |
+| `translateTo` | `""` | Where drafts get translated to. Empty = first writing language that isn't your reading language |
+| `offerTranslation` | `true` | Offer a translation when a draft is in another language |
+| `offerTranslationIgnoredApps` | `[]` | Bundle IDs where that offer never shows (e.g. the chat app you use with family) |
+| `translateSelection` | `true` | Show the Translate button on selected text |
 
 Your vocabulary lives next to it, in `vocabulary.txt`.
 
@@ -191,12 +238,19 @@ flowchart LR
 4. **Apply.** Babelpen selects the field's text through Accessibility and pastes the fix, only if that app is still in
    front. Setting the value directly is ignored by most web editors; pasting works in native, web and Electron fields
    and keeps the app's undo. Your clipboard is restored right after.
+5. **Rewrite, translate, explain.** These go to a second engine process with its own instructions, started the first
+   time a card with buttons shows up, so proofreading stays strict and fast. Selected text is read through
+   Accessibility (`AXSelectedText`, or text markers on the web area in Chromium, Electron and WebKit apps). Only when
+   an app exposes neither does <kbd>⌃</kbd><kbd>⌥</kbd><kbd>T</kbd> copy the selection with ⌘C, and your clipboard is
+   restored right after.
 
 ## Privacy
 
 - Your text goes **only** to the engine you chose, through its own CLI and your own account. Babelpen has no server.
 - API keys (`ANTHROPIC_*`, `OPENAI_API_KEY`, …) are never passed to the CLI, and Claude Code is refused if it
   reports an API key, so reviews always run on your logged-in plan.
+- Selected text is only sent to the engine when you click **Translate** or press <kbd>⌃</kbd><kbd>⌥</kbd><kbd>T</kbd>.
+  Deciding whether to show the button is done on your Mac.
 - Password fields are never read. Terminals, IDEs and password managers are ignored by default (editable list).
 - The log (`~/Library/Logs/Babelpen.log`) only has timings and counts, never text.
 - Claude Code runs with no tools, no MCP servers, no project memory and no session persistence.
@@ -220,7 +274,7 @@ Please [open an issue](https://github.com/AllanLotta/babelpen/issues) with the a
 - [ ] Underline issues inline, in the text itself
 - [ ] Accept fixes one by one instead of the whole text
 - [ ] Review only the paragraph around the caret in long documents (emails with quoted history)
-- [ ] Optional "rewrite naturally" mode for language learners
+- [x] Rewrite on demand (Improve, Formal, Casual) and translation of drafts and selected text
 - [x] Signed, notarized releases
 - [ ] Homebrew cask
 - [ ] Per-app settings

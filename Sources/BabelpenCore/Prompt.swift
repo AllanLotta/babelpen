@@ -42,6 +42,11 @@ public enum Prompt {
     """
 
     public static func userMessage(_ text: String, context: PromptContext = PromptContext()) -> String {
+        contextBlock(context) + "<text>\n\(text)\n</text>"
+    }
+
+    /// The `<context>` block (languages, note, vocabulary), or "" when there's nothing to say.
+    public static func contextBlock(_ context: PromptContext) -> String {
         var lines: [String] = []
         if !context.languages.isEmpty { lines.append("Writer's languages: \(context.languages.joined(separator: ", ")).") }
         let about = context.about.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -49,8 +54,7 @@ public enum Prompt {
         if !context.vocabulary.isEmpty {
             lines.append("Vocabulary (keep exactly as written): \(context.vocabulary.joined(separator: " | "))")
         }
-        let block = lines.isEmpty ? "" : "<context>\n\(lines.joined(separator: "\n"))\n</context>\n"
-        return block + "<text>\n\(text)\n</text>"
+        return lines.isEmpty ? "" : "<context>\n\(lines.joined(separator: "\n"))\n</context>\n"
     }
 
     /// Single prompt for engines without a separate system prompt (Codex, custom commands).
@@ -59,9 +63,12 @@ public enum Prompt {
     }
 
     /// Extracts the text inside `<fixed>…</fixed>`.
-    public static func parseFixed(_ raw: String) -> String? {
-        guard let open = raw.range(of: "<fixed>"),
-              let close = raw.range(of: "</fixed>", options: .backwards),
+    public static func parseFixed(_ raw: String) -> String? { tag("fixed", in: raw) }
+
+    /// Text between `<name>` and the last `</name>`, minus one leading and trailing newline.
+    public static func tag(_ name: String, in raw: String) -> String? {
+        guard let open = raw.range(of: "<\(name)>"),
+              let close = raw.range(of: "</\(name)>", options: .backwards),
               open.upperBound <= close.lowerBound else { return nil }
         var s = String(raw[open.upperBound..<close.lowerBound])
         if s.hasPrefix("\n") { s.removeFirst() }

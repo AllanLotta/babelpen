@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.0
+
+Proofreading stays strict. Everything else is now one click away.
+
+- **Rewrite on demand:** every card has **✨ Improve**, **Formal** and **Casual** buttons. The result shows as a diff
+  and only lands when you press Apply. <kbd>⌃⌥E</kbd> brings the buttons to any field.
+- **Translate your drafts:** a **→ English** (or your language) button on the card. When a draft is in another
+  language than the one you translate to, Babelpen offers the translation by itself (dismiss once per field, or turn
+  it off per app with `offerTranslationIgnoredApps`).
+- **Translate what you read:** select a message in another language and a **🌐 Translate** button appears, with the
+  translation and a short note on what the author means (tone, implied requests, idioms, slang). Or press <kbd>⌃⌥T</kbd>.
+- Rewrites and translations run on a second engine process with their own prompt, started on first use.
+  Optional `assistModel` to use a bigger model for them.
+- Language detection for these features runs on your Mac (Apple's NaturalLanguage).
+- <kbd>⌃⌥B</kbd> opens the Babelpen menu at the mouse pointer. On a MacBook with a notch, macOS hides menu bar icons
+  that don't fit, and the ✎ can end up behind it.
+
 ## 0.2.0
 
 Revisor is now **Babelpen**: proofreading for every language, in every app.

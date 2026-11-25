@@ -13,17 +13,41 @@ final class FirstMouseButton: NSButton {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
-/// The suggestion card: header, diff (red strikethrough = removed, blue = added), buttons.
+/// What a card shows. Empty parts are hidden.
+struct Card {
+    var header = ""
+    var body: NSAttributedString?
+    /// Smaller, secondary text under the body (e.g. what a message implies).
+    var note = ""
+    /// Small buttons in a row: rewrite modes, translate.
+    var actions: [(id: String, title: String)] = []
+    /// The action whose result is showing, drawn highlighted.
+    var activeAction: String?
+    var primary: String?
+    var secondary: String?
+    /// Just the action buttons, sized to fit: the "Translate" chip.
+    var compact = false
+}
+
+/// A floating card next to a field or a selection: header, diff or text,
+/// action buttons, and Apply/Dismiss.
 final class SuggestionPanel {
     private let panel: FloatingPanel
     private let header = NSTextField(labelWithString: "")
     private let body = NSTextField(labelWithString: "")
-    private let applyButton = FirstMouseButton(title: "", target: nil, action: nil)
-    private let dismissButton = FirstMouseButton(title: "", target: nil, action: nil)
-    private let width: CGFloat = 380
+    private let note = NSTextField(labelWithString: "")
+    private let actionsRow = NSStackView()
+    private let primaryButton = FirstMouseButton(title: "", target: nil, action: nil)
+    private let secondaryButton = FirstMouseButton(title: "", target: nil, action: nil)
+    private let buttons = NSStackView()
+    private let stack = NSStackView()
+    private let width: CGFloat = 400
+    private var fixedWidth: [NSLayoutConstraint] = []
+    private var actionIDs: [String] = []
 
-    var onApply: (() -> Void)?
-    var onDismiss: (() -> Void)?
+    var onPrimary: (() -> Void)?
+    var onSecondary: (() -> Void)?
+    var onAction: ((String) -> Void)?
     var isVisible: Bool { panel.isVisible }
 
     init() {
@@ -46,25 +70,34 @@ final class SuggestionPanel {
         header.font = .systemFont(ofSize: 11, weight: .semibold)
         header.textColor = .secondaryLabelColor
 
-        body.maximumNumberOfLines = 0
-        body.lineBreakMode = .byWordWrapping
-        body.preferredMaxLayoutWidth = width - 24
-        body.setContentCompressionResistancePriority(.required, for: .vertical)
+        for label in [body, note] {
+            label.maximumNumberOfLines = 0
+            label.lineBreakMode = .byWordWrapping
+            label.preferredMaxLayoutWidth = width - 24
+            label.setContentCompressionResistancePriority(.required, for: .vertical)
+        }
+        body.maximumNumberOfLines = 24
+        body.lineBreakMode = .byTruncatingTail
+        note.font = .systemFont(ofSize: 12)
+        note.textColor = .secondaryLabelColor
 
-        applyButton.bezelStyle = .rounded
-        applyButton.contentTintColor = .controlAccentColor
-        dismissButton.bezelStyle = .rounded
-        applyButton.target = self
-        applyButton.action = #selector(applyClicked)
-        dismissButton.target = self
-        dismissButton.action = #selector(dismissClicked)
+        actionsRow.orientation = .horizontal
+        actionsRow.spacing = 6
 
-        let buttons = NSStackView(views: [NSView(), dismissButton, applyButton])
+        primaryButton.bezelStyle = .rounded
+        primaryButton.contentTintColor = .controlAccentColor
+        secondaryButton.bezelStyle = .rounded
+        primaryButton.target = self
+        primaryButton.action = #selector(primaryClicked)
+        secondaryButton.target = self
+        secondaryButton.action = #selector(secondaryClicked)
+
+        [NSView(), secondaryButton, primaryButton].forEach(buttons.addArrangedSubview)
         buttons.orientation = .horizontal
         buttons.spacing = 8
         buttons.translatesAutoresizingMaskIntoConstraints = false
 
-        let stack = NSStackView(views: [header, body, buttons])
+        [header, body, note, actionsRow, buttons].forEach(stack.addArrangedSubview)
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
@@ -77,31 +110,60 @@ final class SuggestionPanel {
             stack.trailingAnchor.constraint(equalTo: background.trailingAnchor),
             stack.topAnchor.constraint(equalTo: background.topAnchor),
             stack.bottomAnchor.constraint(equalTo: background.bottomAnchor),
+        ])
+        fixedWidth = [
             stack.widthAnchor.constraint(equalToConstant: width),
             buttons.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -24),
-        ])
+        ]
         panel.contentView = background
     }
 
-    func setStrings(_ l10n: L10n) {
-        applyButton.title = l10n.apply
-        dismissButton.title = l10n.dismiss
+    @objc private func primaryClicked() { onPrimary?() }
+    @objc private func secondaryClicked() { onSecondary?() }
+    @objc private func actionClicked(_ sender: NSButton) {
+        guard sender.tag >= 0, sender.tag < actionIDs.count else { return }
+        onAction?(actionIDs[sender.tag])
     }
 
-    @objc private func applyClicked() { onApply?() }
-    @objc private func dismissClicked() { onDismiss?() }
-
     /// Shows the card below `anchor` (AX coordinates), or above it when there's no room.
-    func show(diff: NSAttributedString, header text: String, anchor: CGRect) {
-        header.stringValue = text
-        body.attributedStringValue = diff
+    func show(_ card: Card, anchor: CGRect) {
+        header.stringValue = card.header
+        header.isHidden = card.header.isEmpty
+        body.attributedStringValue = card.body ?? NSAttributedString()
+        body.isHidden = card.body == nil
+        note.stringValue = card.note
+        note.isHidden = card.note.isEmpty
+
+        actionsRow.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        actionIDs = card.actions.map(\.id)
+        for (i, action) in card.actions.enumerated() {
+            let button = FirstMouseButton(title: action.title, target: self, action: #selector(actionClicked(_:)))
+            button.tag = i
+            button.bezelStyle = .rounded
+            button.controlSize = card.compact ? .regular : .small
+            button.font = .systemFont(ofSize: card.compact ? 13 : 11, weight: action.id == card.activeAction ? .semibold : .regular)
+            if action.id == card.activeAction { button.contentTintColor = .controlAccentColor }
+            actionsRow.addArrangedSubview(button)
+        }
+        actionsRow.isHidden = card.actions.isEmpty
+
+        primaryButton.title = card.primary ?? ""
+        primaryButton.isHidden = card.primary == nil
+        secondaryButton.title = card.secondary ?? ""
+        secondaryButton.isHidden = card.secondary == nil
+        buttons.isHidden = card.primary == nil && card.secondary == nil
+
+        stack.edgeInsets = card.compact ? NSEdgeInsets(top: 5, left: 5, bottom: 5, right: 5)
+                                        : NSEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
+        if card.compact { NSLayoutConstraint.deactivate(fixedWidth) } else { NSLayoutConstraint.activate(fixedWidth) }
+
         panel.contentView?.layoutSubtreeIfNeeded()
         let size = panel.contentView?.fittingSize ?? NSSize(width: width, height: 120)
 
         let a = AX.toCocoa(anchor)
         let screen = NSScreen.screens.first { $0.frame.intersects(a) } ?? NSScreen.main ?? NSScreen.screens[0]
         let visible = screen.visibleFrame
-        let gap: CGFloat = 8
+        let gap: CGFloat = card.compact ? 4 : 8
         let below = a.minY - size.height - gap
         var origin = NSPoint(x: a.minX, y: below >= visible.minY ? below : a.maxY + gap)
         origin.x = min(max(origin.x, visible.minX + 8), visible.maxX - size.width - 8)
@@ -114,6 +176,11 @@ final class SuggestionPanel {
 }
 
 enum DiffRenderer {
+    /// Plain text in the card's body style; `dim` for "working on it" states.
+    static func text(_ s: String, dim: Bool = false, font: NSFont = .systemFont(ofSize: 13)) -> NSAttributedString {
+        NSAttributedString(string: s, attributes: [.font: font, .foregroundColor: dim ? NSColor.secondaryLabelColor : NSColor.labelColor])
+    }
+
     static func render(_ ops: [Diff.Op], font: NSFont = .systemFont(ofSize: 13)) -> NSAttributedString {
         let out = NSMutableAttributedString()
         let same: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]

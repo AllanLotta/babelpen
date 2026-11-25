@@ -98,6 +98,108 @@ enum AX {
         return nil
     }
 
+    // MARK: - Selected text (read-only, anywhere)
+
+    struct Selection {
+        let text: String
+        /// Screen rect of the selection (AX coordinates), when the app exposes it.
+        let bounds: CGRect?
+    }
+
+    private static var webAreaCache: (pid: pid_t, at: Date, areas: [AXUIElement]) = (0, .distantPast, [])
+
+    /// Text selected in the frontmost app: native controls (AXSelectedText), then
+    /// web content in Chromium/Electron/WebKit (text markers on the AXWebArea
+    /// around the focus, or any web area in the focused window).
+    /// `deep` also searches the focused window for web areas (slower, cached).
+    static func selection(pid: pid_t, focused: AXUIElement?, deep: Bool = true) -> Selection? {
+        if let f = focused {
+            if (attribute(f, kAXSubroleAttribute) as String?) == kAXSecureTextFieldSubrole as String { return nil }
+            if let text: String = attribute(f, kAXSelectedTextAttribute), text.contains(where: { !$0.isWhitespace }) {
+                return Selection(text: text, bounds: selectedBounds(f))
+            }
+            if let area = webArea(around: f), let s = markerSelection(area) { return s }
+        }
+        guard deep else { return nil }
+        for area in webAreas(pid: pid) {
+            if let s = markerSelection(area) { return s }
+        }
+        return nil
+    }
+
+    private static var ancestorCache: (element: AXUIElement, area: AXUIElement?)?
+
+    /// The AXWebArea containing `element` (itself included), remembered per
+    /// focused element so the tree is walked once, not on every tick.
+    private static func webArea(around element: AXUIElement) -> AXUIElement? {
+        if let cache = ancestorCache, CFEqual(cache.element, element) { return cache.area }
+        var current: AXUIElement? = element
+        var found: AXUIElement?
+        for _ in 0..<40 {
+            guard let e = current else { break }
+            if (attribute(e, kAXRoleAttribute) as String?) == "AXWebArea" { found = e; break }
+            current = elementAttribute(e, kAXParentAttribute)
+        }
+        ancestorCache = (element, found)
+        return found
+    }
+
+    private static func markerSelection(_ area: AXUIElement) -> Selection? {
+        var range: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(area, "AXSelectedTextMarkerRange" as CFString, &range) == .success,
+              let range else { return nil }
+        var out: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(area, "AXStringForTextMarkerRange" as CFString, range, &out) == .success,
+              let text = out as? String, text.contains(where: { !$0.isWhitespace }) else { return nil }
+        var bounds: CGRect?
+        var b: CFTypeRef?
+        if AXUIElementCopyParameterizedAttributeValue(area, "AXBoundsForTextMarkerRange" as CFString, range, &b) == .success,
+           let b, CFGetTypeID(b) == AXValueGetTypeID() {
+            var rect = CGRect.zero
+            if AXValueGetValue(b as! AXValue, .cgRect, &rect), rect.width > 0, rect.height > 0 { bounds = rect }
+        }
+        return Selection(text: text, bounds: bounds)
+    }
+
+    private static func selectedBounds(_ element: AXUIElement) -> CGRect? {
+        guard var range = selectedRange(element), range.length > 0, let rv = AXValueCreate(.cfRange, &range) else { return nil }
+        var out: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(
+            element, kAXBoundsForRangeParameterizedAttribute as CFString, rv, &out) == .success,
+            let out, CFGetTypeID(out) == AXValueGetTypeID() else { return nil }
+        var rect = CGRect.zero
+        return AXValueGetValue(out as! AXValue, .cgRect, &rect) && rect.width > 0 && rect.height > 0 ? rect : nil
+    }
+
+    /// Web areas of the app's focused window, cached for a few seconds (finding
+    /// them walks the tree).
+    private static func webAreas(pid: pid_t) -> [AXUIElement] {
+        if webAreaCache.pid == pid, Date().timeIntervalSince(webAreaCache.at) < 3 { return webAreaCache.areas }
+        var found: [AXUIElement] = []
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 0.25)
+        if let window = elementAttribute(app, kAXFocusedWindowAttribute) {
+            var queue: [(AXUIElement, Int)] = [(window, 0)]
+            var visited = 0
+            while !queue.isEmpty, visited < 400, found.count < 4 {
+                let (element, depth) = queue.removeFirst()
+                visited += 1
+                if (attribute(element, kAXRoleAttribute) as String?) == "AXWebArea" { found.append(element); continue }
+                guard depth < 14, let children: [AXUIElement] = attribute(element, kAXChildrenAttribute) else { continue }
+                queue += children.map { ($0, depth + 1) }
+            }
+        }
+        webAreaCache = (pid, Date(), found)
+        return found
+    }
+
+    /// A small rect at the mouse pointer, in AX coordinates.
+    static func mouseAnchor() -> CGRect {
+        let p = NSEvent.mouseLocation
+        let mainHeight = NSScreen.screens.first?.frame.height ?? 0
+        return CGRect(x: p.x - 8, y: mainHeight - p.y - 10, width: 16, height: 20)
+    }
+
     /// AX global coordinates (top-left origin) → Cocoa screen coordinates (bottom-left origin).
     static func toCocoa(_ r: CGRect) -> CGRect {
         let mainHeight = NSScreen.screens.first?.frame.height ?? 0

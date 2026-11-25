@@ -10,11 +10,7 @@ import ApplicationServices
 enum TextReplacer {
     static func replaceAll(in element: AXUIElement, current: String, with text: String) {
         let pasteboard = NSPasteboard.general
-        let saved: [[NSPasteboard.PasteboardType: Data]] = pasteboard.pasteboardItems?.map { item in
-            var data: [NSPasteboard.PasteboardType: Data] = [:]
-            for type in item.types { if let d = item.data(forType: type) { data[type] = d } }
-            return data
-        } ?? []
+        let saved = Clipboard.save()
 
         let length = (current as NSString).length
         let selected = AX.setSelectedRange(element, CFRange(location: 0, length: length))
@@ -25,15 +21,7 @@ enum TextReplacer {
         pasteboard.setString(text, forType: .string)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             sendKey(0x09, flags: .maskCommand) // ⌘V
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                pasteboard.clearContents()
-                let items = saved.map { data -> NSPasteboardItem in
-                    let item = NSPasteboardItem()
-                    for (type, d) in data { item.setData(d, forType: type) }
-                    return item
-                }
-                if !items.isEmpty { pasteboard.writeObjects(items) }
-            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { Clipboard.restore(saved) }
         }
     }
 
@@ -45,5 +33,49 @@ enum TextReplacer {
         up?.flags = flags
         down?.post(tap: .cghidEventTap)
         up?.post(tap: .cghidEventTap)
+    }
+}
+
+/// Saving and restoring the clipboard around Babelpen's own copy/paste.
+enum Clipboard {
+    typealias Snapshot = [[NSPasteboard.PasteboardType: Data]]
+
+    static func save() -> Snapshot {
+        NSPasteboard.general.pasteboardItems?.map { item in
+            var data: [NSPasteboard.PasteboardType: Data] = [:]
+            for type in item.types { if let d = item.data(forType: type) { data[type] = d } }
+            return data
+        } ?? []
+    }
+
+    static func restore(_ snapshot: Snapshot) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        let items = snapshot.map { data -> NSPasteboardItem in
+            let item = NSPasteboardItem()
+            for (type, d) in data { item.setData(d, forType: type) }
+            return item
+        }
+        if !items.isEmpty { pasteboard.writeObjects(items) }
+    }
+
+    /// Fallback for apps that don't expose their selection: sends ⌘C to the
+    /// frontmost app, reads the copied text and puts your clipboard back.
+    static func copySelection(completion: @escaping (String?) -> Void) {
+        let pasteboard = NSPasteboard.general
+        let saved = save()
+        let before = pasteboard.changeCount
+        TextReplacer.sendKey(0x08, flags: .maskCommand) // ⌘C
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            guard pasteboard.changeCount != before else { completion(nil); return }
+            let text = pasteboard.string(forType: .string)
+            restore(saved)
+            completion(text)
+        }
+    }
+
+    static func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 }

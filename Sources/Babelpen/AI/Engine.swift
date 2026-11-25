@@ -1,29 +1,41 @@
 import Foundation
 import BabelpenCore
 
-/// Something that proofreads text through a local AI CLI. Babelpen never talks
+/// Something that answers prompts through a local AI CLI. Babelpen never talks
 /// to an API with a key: it drives the CLI you're already logged into, so the
-/// work runs on your existing plan.
-protocol ProofreadEngine: AnyObject {
+/// work runs on your existing plan. Each engine has fixed system instructions
+/// (proofreading, or rewriting/translating) and gets one message per request.
+protocol AIEngine: AnyObject {
     var displayName: String { get }
     /// Set when the engine can't work at all (CLI missing, API key detected…).
     var fatalReason: String? { get }
     var onLog: ((String) -> Void)? { get set }
     func warmUp()
     /// Calls back on the main queue with the model's raw answer, or nil on failure.
-    func proofread(_ text: String, context: PromptContext, completion: @escaping (String?) -> Void)
+    func ask(_ message: String, completion: @escaping (String?) -> Void)
     func shutdown()
 }
 
 enum EngineFactory {
-    static func make(_ config: Config) -> ProofreadEngine {
+    /// The proofreader: strict, minimal edits.
+    static func proofreader(_ config: Config) -> AIEngine {
+        make(config, system: Prompt.system, model: config.model, label: "proofread")
+    }
+
+    /// Rewrites, translations and explanations. Started on first use.
+    static func assistant(_ config: Config) -> AIEngine {
+        make(config, system: Assist.system, model: config.assistModel.isEmpty ? config.model : config.assistModel,
+             label: "assist")
+    }
+
+    private static func make(_ config: Config, system: String, model: String, label: String) -> AIEngine {
         switch config.provider {
         case .claude:
-            return ClaudeCodeEngine(model: config.model.isEmpty ? "haiku" : config.model, effort: config.effort)
+            return ClaudeCodeEngine(model: model.isEmpty ? "haiku" : model, effort: config.effort, system: system, label: label)
         case .codex:
-            return OneShotEngine.codex(model: config.model, effort: config.effort)
+            return OneShotEngine.codex(model: model, effort: config.effort, system: system)
         case .command:
-            return OneShotEngine.custom(command: config.command)
+            return OneShotEngine.custom(command: config.command, system: system)
         }
     }
 }
